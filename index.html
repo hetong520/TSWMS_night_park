@@ -2,78 +2,77 @@
     <!DOCTYPE html>
     <html lang="zh-Hant">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TSWMC 數學建模小組</title>
-        <style>
-            body {
-                margin: 0;
-                overflow: hidden;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            }
-            #webgl-canvas {
-                display: block;
-                width: 100vw;
-                height: 100vh;
-            }
-            #controls-container {
-                position: absolute;
-                top: 15px;
-                left: 15px;
-                background-color: rgba(0, 0, 0, 0.6);
-                padding: 15px;
-                border-radius: 8px;
-                color: white;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                align-items: flex-start;
-            }
-            #spray-button {
-                padding: 10px 15px;
-                font-size: 16px;
-                cursor: pointer;
-                border: 1px solid #666;
-                background-color: #444;
-                color: white;
-                border-radius: 5px;
-                transition: background-color 0.3s;
-            }
-            #spray-button:hover {
-                background-color: #555;
-            }
-            #info {
-                font-size: 14px;
-                max-width: 250px;
-            }
-            #temperature-display {
-                position: absolute;
-                top: 15px;
-                right: 15px;
-                background-color: rgba(0, 0, 0, 0.6);
-                padding: 10px 15px;
-                border-radius: 8px;
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
-            }
-        </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSWMC 數學建模小組</title>
+    <style>
+    body {
+    margin: 0;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    #webgl-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    }
+    #controls-container {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 15px;
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+    }
+    #spray-button {
+    padding: 10px 15px;
+    font-size: 16px;
+    cursor: pointer;
+    border: 1px solid #666;
+    background-color: #444;
+    color: white;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+    }
+    #spray-button:hover {
+    background-color: #555;
+    }
+    #info {
+    font-size: 14px;
+    max-width: 250px;
+    }
+    #temperature-display {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 10px 15px;
+    border-radius: 8px;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    }
+    </style>
     </head>
     <body>
-        <div id="controls-container">
-            <button id="spray-button">開啟水霧</button>
-            <div id="info">
-                <strong>操作:</strong><br>
-                - 按住滑鼠左鍵並拖曳: 旋轉視角<br>
-                - 按住滑鼠右鍵並拖曳: 平移視角<br>
-                - 滾動滑鼠滾輪: 縮放視角<br>
-                - 注:由天水圍循道衞理中學的數學建模小組成員創建<br>
-            </div>
-        </div>
-        <div id="temperature-display">29.0°C</div>
-        <canvas id="webgl-canvas"></canvas>
-    
-        <!-- 引入 Three.js -->
+    <div id="controls-container">
+    <button id="spray-button">開啟水霧</button>
+    <div id="info">
+    <strong>操作:</strong><br>
+    - 按住滑鼠左鍵並拖曳: 旋轉視角<br>
+    - 按住滑鼠右鍵並拖曳: 平移視角<br>
+    - 滾動滑鼠滾輪: 縮放視角<br>
+    - 注:由天水圍循道衞理中學的數學建模小組成員創建<br>
+    </div>
+    </div>
+    <div id="temperature-display">29.0°C</div>
+    <canvas id="webgl-canvas"></canvas>
+        
         <script type="importmap">
             {
                 "imports": {
@@ -82,7 +81,6 @@
                 }
             }
         </script>
-    
         <script type="module">
             import * as THREE from 'three';
             import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -95,7 +93,7 @@
     
             const parkSize = { width: 40, depth: 32 };
             const totalSize = { width: 50, depth: 32 }; // 僅一邊延伸，調整總寬度為50 (40 + 10)
-            const gravity = new THREE.Vector3(0, -0.9, 0);
+            const gravity = new THREE.Vector3(0, -0.5, 0); // 調整重力為-0.5，使粒子更慢落下
     
             const facilities = [
                 { name: 'slide', pos: new THREE.Vector3(12, 0, 8), radius: 4 },
@@ -109,7 +107,7 @@
             let currentTemperature = 29.0;
             const minTemperature = 27.0;
             const maxTemperature = 29.0;
-            const temperatureChangeRate = 0.15; // 每秒變化0.15°C（介於0.1-0.2之間）
+            const temperatureChangeRate = 0.10; // 每秒變化0.15°C（介於0.1-0.2之間）
     
             let persons = [];
     
@@ -556,7 +554,7 @@
     
             // --- Particle System ---
             function createParticleSystem() {
-                const particleCount = 1500;
+                const particleCount = 500; // 減少粒子數量
                 const particles = new THREE.BufferGeometry();
                 const positions = new Float32Array(particleCount * 3);
                 const particleData = [];
@@ -575,6 +573,7 @@
                 const pMaterial = new THREE.PointsMaterial({
                     color: 0xeeeeff, size: 0.15, map: particleTexture,
                     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
+                    opacity: 0.1
                 });
                 for (let i = 0; i < particleCount; i++) {
                     particleData.push({ position: new THREE.Vector3(), velocity: new THREE.Vector3(), lifetime: 0 });
@@ -610,8 +609,8 @@
                             if (p.position.y <= 0.05) {
                                 p.lifetime = 0; // Disappear on ground contact
                             }
-                        } else if (Math.random() < 0.08) {
-                            p.lifetime = 2.5 + Math.random() * 1.5;
+                        } else if (Math.random() < 0.03) { // 降低產生概率
+                            p.lifetime = 3.0 + Math.random() * 2.0; // 增加生命週期
                             p.position.copy(origin);
                             
                             const directionChoice = sprayDirections[Math.floor(Math.random() * sprayDirections.length)];
@@ -620,15 +619,15 @@
                             const baseAngle = (directionChoice === 'right') ? 0 : Math.PI;
                             
                             // Fan shape spread for front/back (along Z axis)
-                            const fanAngleSpread = 1.4; // Radians, approx 80 degrees
+                            const fanAngleSpread = 2.0; // 增加扇形角度
                             const randomAngleOffset = (Math.random() - 0.5) * fanAngleSpread;
                             
                             const finalAngle = baseAngle + randomAngleOffset;
-                            const speed = 1.2 + Math.random() * 0.3;
+                            const speed = 0.8 + Math.random() * 0.6; // 調整速度範圍
                             
                             p.velocity.set(
                                 Math.cos(finalAngle) * speed,
-                                0.1, // Slight initial upward velocity
+                                0.05, // 降低初始向上速度
                                 Math.sin(finalAngle) * speed // This component creates the front/back spread
                             );
                         }
