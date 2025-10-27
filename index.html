@@ -1,807 +1,824 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSWMC 數學建模小組</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        }
-        #webgl-canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
-        #controls-container {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background-color: rgba(0, 0, 0, 0.6);
-            padding: 15px;
-            border-radius: 8px;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-start;
-        }
-        #spray-button {
-            padding: 10px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            border: 1px solid #666;
-            background-color: #444;
-            color: white;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        #spray-button:hover {
-            background-color: #555;
-        }
-        #info {
-            font-size: 14px;
-            max-width: 250px;
-        }
-        #temperature-display {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background-color: rgba(0, 0, 0, 0.6);
-            padding: 10px 15px;
-            border-radius: 8px;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div id="controls-container">
-        <button id="spray-button">開啟水霧</button>
-        <div id="info">
-            <strong>操作:</strong><br>
-            - 按住滑鼠左鍵並拖曳: 旋轉視角<br>
-            - 按住滑鼠右鍵並拖曳: 平移視角<br>
-            - 滾動滑鼠滾輪: 縮放視角<br>
-            - 注:由天水圍循道衞理中學的數學建模小組成員創建<br>
+<DOCUMENT filename="index.html">
+    <!DOCTYPE html>
+    <html lang="zh-Hant">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>TSWMC 數學建模小組</title>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            }
+            #webgl-canvas {
+                display: block;
+                width: 100vw;
+                height: 100vh;
+            }
+            #controls-container {
+                position: absolute;
+                top: 15px;
+                left: 15px;
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 15px;
+                border-radius: 8px;
+                color: white;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            #spray-button {
+                padding: 10px 15px;
+                font-size: 16px;
+                cursor: pointer;
+                border: 1px solid #666;
+                background-color: #444;
+                color: white;
+                border-radius: 5px;
+                transition: background-color 0.3s;
+            }
+            #spray-button:hover {
+                background-color: #555;
+            }
+            #info {
+                font-size: 14px;
+                max-width: 250px;
+            }
+            #temperature-display {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 10px 15px;
+                border-radius: 8px;
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="controls-container">
+            <button id="spray-button">開啟水霧</button>
+            <div id="info">
+                <strong>操作:</strong><br>
+                - 按住滑鼠左鍵並拖曳: 旋轉視角<br>
+                - 按住滑鼠右鍵並拖曳: 平移視角<br>
+                - 滾動滑鼠滾輪: 縮放視角<br>
+                - 注:由天水圍循道衞理中學的數學建模小組成員創建<br>
+            </div>
         </div>
-    </div>
-    <div id="temperature-display">29.0°C</div>
-    <canvas id="webgl-canvas"></canvas>
-
-    <!-- 引入 Three.js -->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-        let scene, camera, renderer, controls;
-        let poles = [];
-        let particleSystems = [];
-        let isSpraying = false;
-        const clock = new THREE.Clock();
-
-        const parkSize = { width: 40, depth: 32 };
-        const totalSize = { width: 50, depth: 32 }; // 僅一邊延伸，調整總寬度為50 (40 + 10)
-        const gravity = new THREE.Vector3(0, -0.9, 0);
-
-        const facilities = [
-            { name: 'slide', pos: new THREE.Vector3(12, 0, 8), radius: 4 },
-            { name: 'swing', pos: new THREE.Vector3(-12, 0, -8), radius: 4 },
-            { name: 'seesaw', pos: new THREE.Vector3(0, 0, 10), radius: 3 },
-            { name: 'jungleGym', pos: new THREE.Vector3(-10, 0, 5), radius: 4 },
-            { name: 'sandbox', pos: new THREE.Vector3(10, 0, -10), radius: 3 },
-            { name: 'merryGoRound', pos: new THREE.Vector3(0, 0, -5), radius: 3 }
-        ];
-
-        let currentTemperature = 29.0;
-        const minTemperature = 27.0;
-        const maxTemperature = 29.0;
-        const temperatureChangeRate = 0.15; // 每秒變化0.15°C（介於0.1-0.2之間）
-
-        let persons = [];
-
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050a19);
-            scene.fog = new THREE.Fog(0x050a19, 70, 150);
-
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 20, 35);
-
-            const canvas = document.getElementById('webgl-canvas');
-            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.maxPolarAngle = Math.PI / 2 - 0.05;
-            controls.target.set(0, 2, 0);
-            controls.update();
-
-            createLights();
-            createGround();
-            createBrickPathsAndBenches();
-            createSchoolBuilding();
-            createFacilities();
-            createFlowerBushes();
-            createPoles();
-
-            window.addEventListener('resize', onWindowResize, false);
-            document.getElementById('spray-button').addEventListener('click', toggleSpraying);
-
-            animate();
-        }
-
-        function createLights() {
-            const ambientLight = new THREE.AmbientLight(0x404080, 0.7);
-            scene.add(ambientLight);
-
-            const moonLight = new THREE.DirectionalLight(0xb0c4de, 1.2);
-            moonLight.position.set(50, 60, 40);
-            moonLight.castShadow = true;
-            moonLight.shadow.mapSize.width = 4096;
-            moonLight.shadow.mapSize.height = 4096;
-            moonLight.shadow.camera.left = -totalSize.width / 2 - 5;
-            moonLight.shadow.camera.right = totalSize.width / 2 + 5;
-            moonLight.shadow.camera.top = totalSize.depth / 2 + 5;
-            moonLight.shadow.camera.bottom = -totalSize.depth / 2 - 5;
-            moonLight.shadow.bias = -0.001;
-            scene.add(moonLight);
-        }
-
-        function createGround() {
-            const groundGeometry = new THREE.PlaneGeometry(parkSize.width, parkSize.depth);
-            const groundMaterial = new THREE.MeshStandardMaterial({
-                color: 0x2E8B57,
-                roughness: 0.95,
-                metalness: 0.05
-            });
-            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
-
-            const gridHelper = new THREE.GridHelper(parkSize.width, parkSize.width, 0x444444, 0x444444);
-            gridHelper.position.y = 0.01;
-            scene.add(gridHelper);
-        }
-
-        function createBrickTexture() {
-            const canvas = document.createElement('canvas');
-            const size = 256;
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = '#8B4513'; // Red-brown
-            ctx.fillRect(0, 0, size, size);
-            
-            ctx.strokeStyle = '#5C4033'; // Darker mortar color
-            ctx.lineWidth = 4;
-
-            const brickSize = size / 4;
-            for (let i = 0; i <= 4; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * brickSize, 0);
-                ctx.lineTo(i * brickSize, size);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, i * brickSize);
-                ctx.lineTo(size, i * brickSize);
-                ctx.stroke();
-            }
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(10, 32); // Repeat texture to simulate 1x1 bricks
-            return texture;
-        }
-
-        function createBrickPathsAndBenches() {
-            const pathWidth = totalSize.width - parkSize.width; // 僅一邊延伸
-            const pathDepth = totalSize.depth;
-            const brickMat = new THREE.MeshStandardMaterial({
-                map: createBrickTexture(),
-                roughness: 0.8
-            });
-
-            const pathGeom = new THREE.PlaneGeometry(pathWidth, pathDepth);
-            
-            // 只在左邊延伸
-            const pathLeft = new THREE.Mesh(pathGeom, brickMat);
-            pathLeft.rotation.x = -Math.PI / 2;
-            pathLeft.position.x = -parkSize.width / 2 - pathWidth / 2;
-            pathLeft.receiveShadow = true;
-            scene.add(pathLeft);
-
-            // Benches on left path, facing the park (reversed direction)
-            const benchLeft1 = createBench();
-            benchLeft1.position.set(-parkSize.width / 2 - 2, 0, 5);
-            benchLeft1.rotation.y = -Math.PI / 2; // 反轉方向，面對負x方向? 調整為面對公園
-            scene.add(benchLeft1);
-
-            const benchLeft2 = createBench();
-            benchLeft2.position.set(-parkSize.width / 2 - 2, 0, -5);
-            benchLeft2.rotation.y = -Math.PI / 2; // 反轉方向
-            scene.add(benchLeft2);
-        }
-
-        function createBench() {
-            const group = new THREE.Group();
-            const woodMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 });
-
-            const plankGeom = new THREE.BoxGeometry(3, 0.1, 0.3);
-            for(let i = 0; i < 3; i++) {
-                const seatPlank = new THREE.Mesh(plankGeom, woodMat);
-                seatPlank.position.set(0, 0.5, -0.35 + i * 0.35);
-                group.add(seatPlank);
-            }
-             for(let i = 0; i < 4; i++) {
-                const backPlank = new THREE.Mesh(plankGeom, woodMat);
-                backPlank.position.set(0, 1.0 + i * 0.2, 0.5);
-                backPlank.rotation.x = Math.PI / 2;
-                group.add(backPlank);
-            }
-
-            const legGeom = new THREE.BoxGeometry(0.1, 0.8, 0.8);
-            const leg1 = new THREE.Mesh(legGeom, legMat);
-            leg1.position.set(-1.4, 0.4, 0);
-            group.add(leg1);
-            const leg2 = leg1.clone();
-            leg2.position.x = 1.4;
-            group.add(leg2);
-
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; });
-            return group;
-        }
-
-        function createSchoolSignTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 128;
-            canvas.height = 1024;
-            const ctx = canvas.getContext('2d');
-
-            ctx.fillStyle = '#FDF5E6'; // Match school wall color
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.font = 'bold 90px KaiTi, "SimHei", sans-serif';
-            ctx.fillStyle = '#A52A2A'; // Brown color for text
-            ctx.textAlign = 'center';
-            
-            const text = '學中理衞道循圍水天';
-            const reversed_text = text.split('').reverse().join(''); // 反轉文字方向
-            for (let i = 0; i < reversed_text.length; i++) {
-                ctx.fillText(reversed_text[i], canvas.width / 2, 110 + i * 100);
-            }
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        function createSchoolBuilding() {
-            const group = new THREE.Group();
-            const schoolWidth = 8, schoolHeight = 10, schoolDepth = 8;
-
-            const schoolMat = new THREE.MeshStandardMaterial({
-                color: 0xFDF5E6, // Old Lace - a nice white/beige
-                roughness: 0.8
-            });
-            const schoolGeom = new THREE.BoxGeometry(schoolWidth, schoolHeight, schoolDepth);
-            const schoolMesh = new THREE.Mesh(schoolGeom, schoolMat);
-            schoolMesh.castShadow = true;
-            schoolMesh.receiveShadow = true;
-            group.add(schoolMesh);
-
-            const signTexture = createSchoolSignTexture();
-            const signGeom = new THREE.PlaneGeometry(1.28, 10.24); // 垂直比例
-            const signMat = new THREE.MeshBasicMaterial({ map: signTexture });
-            const signMesh = new THREE.Mesh(signGeom, signMat);
-            
-            // Position sign on the side facing the park (positive x direction)
-            signMesh.position.set(schoolWidth / 2 + 0.01, 0, 0);
-            signMesh.rotation.y = Math.PI / 2; // 反轉旋轉方向
-            group.add(signMesh);
-
-            // Position the whole building
-            const pathEdgeX = -parkSize.width / 2 - (totalSize.width - parkSize.width) / 2;
-            group.position.set(pathEdgeX - schoolWidth / 2 - 2, schoolHeight / 2, 0);
-            
-            scene.add(group);
-        }
-        
-        function createFacilities() {
-            const facilityCreators = {
-                slide: createSlide, swing: createSwing, seesaw: createSeesaw,
-                jungleGym: createJungleGym, sandbox: createSandbox, merryGoRound: createMerryGoRound
-            };
-            facilities.forEach(f => {
-                const facilityMesh = facilityCreators[f.name]();
-                facilityMesh.position.copy(f.pos);
-                scene.add(facilityMesh);
-            });
-        }
-        
-        function createFlowerBushes() {
-            const bushGroup = new THREE.Group();
-            const bushColors = [0xff6347, 0xee82ee, 0xffd700, 0xadd8e6];
-
-            function createBush(position) {
-                const bush = new THREE.Group();
-                const foliageGeom = new THREE.IcosahedronGeometry(0.8 + Math.random() * 0.4, 1);
-                const foliageMat = new THREE.MeshStandardMaterial({ color: 0x004d00, roughness: 0.9 });
-                const foliage = new THREE.Mesh(foliageGeom, foliageMat);
-                foliage.castShadow = true;
-                bush.add(foliage);
-                const flowerCount = 15 + Math.floor(Math.random() * 10);
-                const flowerGeom = new THREE.SphereGeometry(0.1, 8, 8);
-                for (let i = 0; i < flowerCount; i++) {
-                    const flowerMat = new THREE.MeshBasicMaterial({ color: bushColors[Math.floor(Math.random() * bushColors.length)] });
-                    const flower = new THREE.Mesh(flowerGeom, flowerMat);
-                    const phi = Math.random() * Math.PI * 2;
-                    const theta = Math.random() * Math.PI;
-                    flower.position.setFromSphericalCoords(0.8, phi, theta);
-                    bush.add(flower);
-                }
-                bush.position.copy(position);
-                bush.position.y = 0.5;
-                return bush;
-            }
-
-            // Along +Z and -Z edges (parallel)
-            for (let x = -parkSize.width / 2; x <= parkSize.width / 2; x += 2.5) {
-                // Top edge (+Z)
-                const zPosTop = parkSize.depth / 2 - 1;
-                bushGroup.add(createBush(new THREE.Vector3(x + (Math.random() - 0.5), 0, zPosTop)));
-                // Bottom edge (-Z)
-                const zPosBottom = -parkSize.depth / 2 + 1;
-                bushGroup.add(createBush(new THREE.Vector3(x + (Math.random() - 0.5), 0, zPosBottom)));
-            }
-            scene.add(bushGroup);
-        }
-
-        function createPoles() {
-            const step = 8;
-            const avoidanceRadius = 2.0;
-
-            for (let x = -parkSize.width / 2 + step / 2; x <= parkSize.width / 2 - step / 2; x += step) {
-                for (let z = -parkSize.depth / 2 + step / 2; z <= parkSize.depth / 2 - step / 2; z += step) {
-                    const polePos = new THREE.Vector3(x, 0, z);
-                    
-                    let isTooClose = facilities.some(f => polePos.distanceTo(f.pos) < f.radius + avoidanceRadius);
-
-                    if (!isTooClose) {
-                        let sprayDirections = ['left', 'right'];
-                        facilities.forEach(f => {
-                            const dist = polePos.distanceTo(f.pos);
-                            if (dist < f.radius + 5.0) {
-                                const vecToFacility = new THREE.Vector3().subVectors(f.pos, polePos);
-                                // If facility is to the right (+x), remove 'right'
-                                if (vecToFacility.x > 1.0) {
-                                    sprayDirections = sprayDirections.filter(d => d !== 'right');
-                                }
-                                // If facility is to the left (-x), remove 'left'
-                                if (vecToFacility.x < -1.0) {
-                                    sprayDirections = sprayDirections.filter(d => d !== 'left');
-                                }
-                            }
-                        });
-                        
-                        if (sprayDirections.length > 0) {
-                            createPole(polePos, sprayDirections);
-                        }
-                    }
+        <div id="temperature-display">29.0°C</div>
+        <canvas id="webgl-canvas"></canvas>
+    
+        <!-- 引入 Three.js -->
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
                 }
             }
-        }
-        
-        function createPole(position, sprayDirections) {
-            const poleGroup = new THREE.Group();
-            poleGroup.position.copy(position);
-            const poleHeight = 2;
-            const poleRadius = 0.05;
-            const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
-            const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.9, roughness: 0.4 });
-            const poleMesh = new THREE.Mesh(poleGeometry, poleMaterial);
-            poleMesh.position.y = poleHeight / 2;
-            poleMesh.castShadow = true;
-            poleGroup.add(poleMesh);
-            const nozzleGeometry = new THREE.CylinderGeometry(poleRadius * 1.5, poleRadius * 1.5, 0.1, 16);
-            const nozzleMesh = new THREE.Mesh(nozzleGeometry, poleMaterial);
-            nozzleMesh.position.y = poleHeight;
-            poleGroup.add(nozzleMesh);
-            const panelGroup = new THREE.Group();
-            const panelWidth = 0.6;
-            const panelHeight = 0.4;
-            const panelGeometry = new THREE.BoxGeometry(panelWidth, panelHeight, 0.02);
-            const panelTexture = createSolarPanelTexture(panelWidth * 100, panelHeight * 100);
-            const panelMaterial = new THREE.MeshStandardMaterial({ map: panelTexture, side: THREE.DoubleSide });
-            const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-            panelGroup.add(panelMesh);
-            panelGroup.position.set(0, poleHeight - 0.3, 0);
-            panelGroup.rotation.x = Math.PI / 4;
-            poleGroup.add(panelGroup);
-            scene.add(poleGroup);
-            const poleData = {
-                mesh: poleGroup,
-                nozzlePosition: new THREE.Vector3(position.x, position.y + poleHeight, position.z),
-                sprayDirections: sprayDirections
-            };
-            poles.push(poleData);
-            particleSystems.push(createParticleSystem());
-        }
-
-        function createSolarPanelTexture(width, height) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const context = canvas.getContext('2d');
-            context.fillStyle = '#87CEEB';
-            context.fillRect(0, 0, width, height);
-            context.strokeStyle = '#00008B';
-            context.lineWidth = width / 20;
-            context.strokeRect(0, 0, width, height);
-            context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-            context.lineWidth = width / 50;
-            const lineCount = 10;
-            for (let i = 1; i < lineCount; i++) {
-                const y = (i / lineCount) * height;
-                context.beginPath();
-                context.moveTo(0, y);
-                context.lineTo(width, y);
-                context.stroke();
+        </script>
+    
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    
+            let scene, camera, renderer, controls;
+            let poles = [];
+            let particleSystems = [];
+            let isSpraying = false;
+            const clock = new THREE.Clock();
+    
+            const parkSize = { width: 40, depth: 32 };
+            const totalSize = { width: 50, depth: 32 }; // 僅一邊延伸，調整總寬度為50 (40 + 10)
+            const gravity = new THREE.Vector3(0, -0.9, 0);
+    
+            const facilities = [
+                { name: 'slide', pos: new THREE.Vector3(12, 0, 8), radius: 4 },
+                { name: 'swing', pos: new THREE.Vector3(-12, 0, -8), radius: 4 },
+                { name: 'seesaw', pos: new THREE.Vector3(0, 0, 10), radius: 3 },
+                { name: 'jungleGym', pos: new THREE.Vector3(-10, 0, 5), radius: 4 },
+                { name: 'sandbox', pos: new THREE.Vector3(10, 0, -10), radius: 3 },
+                { name: 'merryGoRound', pos: new THREE.Vector3(0, 0, -5), radius: 3 }
+            ];
+    
+            let currentTemperature = 29.0;
+            const minTemperature = 27.0;
+            const maxTemperature = 29.0;
+            const temperatureChangeRate = 0.15; // 每秒變化0.15°C（介於0.1-0.2之間）
+    
+            let persons = [];
+    
+            function init() {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x050a19);
+                scene.fog = new THREE.Fog(0x050a19, 70, 150);
+    
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 20, 35);
+    
+                const canvas = document.getElementById('webgl-canvas');
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.maxPolarAngle = Math.PI / 2 - 0.05;
+                controls.target.set(0, 2, 0);
+                controls.update();
+    
+                createLights();
+                createGround();
+                createBrickPathsAndBenches();
+                createSchoolBuilding();
+                createFacilities();
+                createFlowerBushes();
+                createPoles();
+    
+                window.addEventListener('resize', onWindowResize, false);
+                document.getElementById('spray-button').addEventListener('click', toggleSpraying);
+    
+                animate();
             }
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        // --- Facility Creation Functions (remain the same) ---
-        function createSlide() {
-            const group = new THREE.Group();
-            const slideMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.4, metalness: 0.2 });
-            const supportMat = new THREE.MeshStandardMaterial({ color: 0xdc143c, roughness: 0.7 });
-            const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 6), slideMat);
-            ramp.position.set(0, 1.5, -1); ramp.rotation.x = -Math.PI / 7; group.add(ramp);
-            const platform = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 1.5), slideMat);
-            platform.position.set(0, 3, 2.5); group.add(platform);
-            for (let i = 0; i < 7; i++) {
-                const step = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 0.4), supportMat);
-                step.position.set(0, 0.45 * i + 0.2, 3.5); group.add(step);
+    
+            function createLights() {
+                const ambientLight = new THREE.AmbientLight(0x404080, 0.7);
+                scene.add(ambientLight);
+    
+                const moonLight = new THREE.DirectionalLight(0xb0c4de, 1.2);
+                moonLight.position.set(50, 60, 40);
+                moonLight.castShadow = true;
+                moonLight.shadow.mapSize.width = 4096;
+                moonLight.shadow.mapSize.height = 4096;
+                moonLight.shadow.camera.left = -totalSize.width / 2 - 5;
+                moonLight.shadow.camera.right = totalSize.width / 2 + 5;
+                moonLight.shadow.camera.top = totalSize.depth / 2 + 5;
+                moonLight.shadow.camera.bottom = -totalSize.depth / 2 - 5;
+                moonLight.shadow.bias = -0.001;
+                scene.add(moonLight);
             }
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-        function createSwing() {
-            const group = new THREE.Group();
-            const mat = new THREE.MeshStandardMaterial({ color: 0x4682b4, roughness: 0.6 });
-            const seatMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-            const chainMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 1 });
-            const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4.5), mat);
-            leg1.position.set(-2, 2.1, 0); leg1.rotation.z = Math.PI / 10; group.add(leg1);
-            const leg2 = leg1.clone(); leg2.position.x = 2; leg2.rotation.z = -Math.PI / 10; group.add(leg2);
-            const topBar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5), mat);
-            topBar.position.y = 4; topBar.rotation.z = Math.PI / 2; group.add(topBar);
-            function addSeat(xPos) {
-                const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.5), seatMat);
-                seat.position.set(xPos, 0.8, 0); group.add(seat);
-                const chain1 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 3.2), chainMat);
-                chain1.position.set(xPos - 0.4, 2.4, 0); group.add(chain1);
-                const chain2 = chain1.clone(); chain2.position.x = xPos + 0.4; group.add(chain2);
-            }
-            addSeat(-1.2); addSeat(1.2);
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-        function createSeesaw() {
-            const group = new THREE.Group();
-            const plankMat = new THREE.MeshStandardMaterial({ color: 0x32cd32, roughness: 0.8 });
-            const supportMat = new THREE.MeshStandardMaterial({ color: 0xff4500, roughness: 0.7 });
-            const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1), supportMat);
-            pivot.position.y = 0.5; pivot.rotation.x = Math.PI / 2; group.add(pivot);
-            const plank = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 0.6), plankMat);
-            plank.position.y = 1; plank.rotation.z = Math.PI / 12; group.add(plank);
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-        function createJungleGym() {
-            const group = new THREE.Group();
-            const mat = new THREE.MeshStandardMaterial({ color: 0x00008b, metalness: 0.8, roughness: 0.5 });
-            const bar = new THREE.CylinderGeometry(0.08, 0.08, 4, 12);
-            const positions = [[-2, 2], [2, 2], [-2, -2], [2, -2]];
-            positions.forEach(p => { const post = new THREE.Mesh(bar, mat); post.position.set(p[0], 2, p[1]); group.add(post); });
-            const hBarGeom = new THREE.CylinderGeometry(0.08, 0.08, 4.2, 12);
-            const hBar1 = new THREE.Mesh(hBarGeom, mat); hBar1.position.set(0, 1.5, 2); hBar1.rotation.x = Math.PI / 2; group.add(hBar1);
-            const hBar2 = hBar1.clone(); hBar2.position.z = -2; group.add(hBar2);
-            const hBar3 = new THREE.Mesh(hBarGeom, mat); hBar3.position.set(2, 2.5, 0); hBar3.rotation.z = Math.PI / 2; group.add(hBar3);
-            const hBar4 = hBar3.clone(); hBar4.position.x = -2; group.add(hBar4);
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-        function createSandbox() {
-            const group = new THREE.Group();
-            const woodMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.8 });
-            const sandMat = new THREE.MeshStandardMaterial({ color: 0xf0e68c, roughness: 0.9 });
-            const sand = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), sandMat);
-            sand.position.y = 0.1; sand.receiveShadow = true; group.add(sand);
-            const borderGeom = new THREE.BoxGeometry(4.4, 0.4, 0.2);
-            const border1 = new THREE.Mesh(borderGeom, woodMat); border1.position.set(0, 0.2, 2.1); group.add(border1);
-            const border2 = border1.clone(); border2.position.z = -2.1; group.add(border2);
-            const border3 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 4), woodMat);
-            border3.position.set(2.1, 0.2, 0); group.add(border3);
-            const border4 = border3.clone(); border4.position.x = -2.1; group.add(border4);
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-        function createMerryGoRound() {
-            const group = new THREE.Group();
-            const baseMat = new THREE.MeshStandardMaterial({ color: 0x8a2be2, roughness: 0.6 });
-            const handleMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.7 });
-            const base = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32), baseMat);
-            base.position.y = 0.1; group.add(base);
-            const centerPost = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 16), handleMat);
-            centerPost.position.y = 0.6; group.add(centerPost);
-            const handleWheel = new THREE.Mesh(new THREE.TorusGeometry(1, 0.1, 16, 32), handleMat);
-            handleWheel.position.y = 1.1; handleWheel.rotation.x = Math.PI / 2; group.add(handleWheel);
-            group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
-        }
-
-        // --- Particle System ---
-        function createParticleSystem() {
-            const particleCount = 1500;
-            const particles = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            const particleData = [];
-            const particleTexture = (() => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 128; canvas.height = 128;
-                const context = canvas.getContext('2d');
-                const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
-                gradient.addColorStop(0, 'rgba(255,255,255,0.5)');
-                gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-                gradient.addColorStop(1, 'rgba(255,255,255,0)');
-                context.fillStyle = gradient;
-                context.fillRect(0, 0, 128, 128);
-                return new THREE.CanvasTexture(canvas);
-            })();
-            const pMaterial = new THREE.PointsMaterial({
-                color: 0xeeeeff, size: 0.15, map: particleTexture,
-                blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-            });
-            for (let i = 0; i < particleCount; i++) {
-                particleData.push({ position: new THREE.Vector3(), velocity: new THREE.Vector3(), lifetime: 0 });
-                positions[i * 3 + 1] = -100;
-            }
-            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const particleSystem = new THREE.Points(particles, pMaterial);
-            scene.add(particleSystem);
-            return { system: particleSystem, data: particleData, geometry: particles };
-        }
-
-        function updateParticles(deltaTime) {
-            particleSystems.forEach((ps, poleIndex) => {
-                if (!isSpraying) {
-                    if (ps.system.visible) ps.system.visible = false;
-                    return;
-                }
-                if (!ps.system.visible) ps.system.visible = true;
-
-                const pole = poles[poleIndex];
-                const positions = ps.geometry.attributes.position.array;
-                const origin = pole.nozzlePosition;
-                const sprayDirections = pole.sprayDirections;
-
-                for (let i = 0; i < ps.data.length; i++) {
-                    let p = ps.data[i];
-
-                    if (p.lifetime > 0) {
-                        p.lifetime -= deltaTime;
-                        p.velocity.addScaledVector(gravity, deltaTime);
-                        p.position.addScaledVector(p.velocity, deltaTime);
-                        
-                        if (p.position.y <= 0.05) {
-                            p.lifetime = 0; // Disappear on ground contact
-                        }
-                    } else if (Math.random() < 0.08) {
-                        p.lifetime = 2.5 + Math.random() * 1.5;
-                        p.position.copy(origin);
-                        
-                        const directionChoice = sprayDirections[Math.floor(Math.random() * sprayDirections.length)];
-                        
-                        // Main direction: left (-X) or right (+X)
-                        const baseAngle = (directionChoice === 'right') ? 0 : Math.PI;
-                        
-                        // Fan shape spread for front/back (along Z axis)
-                        const fanAngleSpread = 1.4; // Radians, approx 80 degrees
-                        const randomAngleOffset = (Math.random() - 0.5) * fanAngleSpread;
-                        
-                        const finalAngle = baseAngle + randomAngleOffset;
-                        const speed = 1.2 + Math.random() * 0.3;
-                        
-                        p.velocity.set(
-                            Math.cos(finalAngle) * speed,
-                            0.1, // Slight initial upward velocity
-                            Math.sin(finalAngle) * speed // This component creates the front/back spread
-                        );
-                    }
-
-                    if (p.lifetime > 0) {
-                        positions[i * 3] = p.position.x;
-                        positions[i * 3 + 1] = p.position.y;
-                        positions[i * 3 + 2] = p.position.z;
-                    } else {
-                        positions[i * 3 + 1] = -100; // Hide particle
-                    }
-                }
-                ps.geometry.attributes.position.needsUpdate = true;
-            });
-        }
-
-        function createPerson() {
-            const group = new THREE.Group();
-
-            // Body
-            const bodyGeom = new THREE.BoxGeometry(0.5, 1, 0.3);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x87CEEB });
-            const body = new THREE.Mesh(bodyGeom, bodyMat);
-            body.position.y = 1;
-            group.add(body);
-
-            // Head
-            const headGeom = new THREE.SphereGeometry(0.3, 32, 32);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0xFFDAB9 });
-            const head = new THREE.Mesh(headGeom, headMat);
-            head.position.y = 1.8;
-            group.add(head);
-
-            // Legs
-            const legGeom = new THREE.CylinderGeometry(0.1, 0.1, 1, 16);
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x00008B });
-            const leftLeg = new THREE.Mesh(legGeom, legMat);
-            leftLeg.position.set(-0.15, 0.5, 0);
-            group.add(leftLeg);
-            const rightLeg = leftLeg.clone();
-            rightLeg.position.x = 0.15;
-            group.add(rightLeg);
-
-            group.traverse(c => { if (c.isMesh) c.castShadow = true; });
-            return group;
-        }
-
-        function createDialogueSprite() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 128;
-            const context = canvas.getContext('2d');
-            context.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            context.fillStyle = 'black';
-            context.font = 'bold 36px Arial'; // 加大字体
-            context.textAlign = 'center';
-            context.fillText('現在公園涼了很多,不像之前那麼熱了', canvas.width / 2, canvas.height / 2);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.SpriteMaterial({ map: texture });
-            const sprite = new THREE.Sprite(material);
-            sprite.scale.set(5, 1.25, 1); // 相应调整scale以匹配加大字体
-            return sprite;
-        }
-
-        function getRandomPosition(outside) {
-            const x = (Math.random() - 0.5) * parkSize.width;
-            const z = (Math.random() - 0.5) * parkSize.depth;
-            if (outside) {
-                // From outside, e.g., from left side
-                return new THREE.Vector3(-parkSize.width / 2 - Math.random() * 5 - 1, 0, z);
-            } else {
-                // Inside park
-                return new THREE.Vector3(x, 0, z);
-            }
-        }
-
-        function updatePersons(deltaTime) {
-            persons.forEach(person => {
-                if (person.active) {
-                    person.progress += deltaTime * person.speed / person.start.distanceTo(person.end);
-                    if (person.progress >= 1) {
-                        person.progress = 1;
-                        person.active = false;
-                    }
-                    person.group.position.lerpVectors(person.start, person.end, person.progress);
-                    person.sprite.position.set(person.group.position.x, person.group.position.y + 2.5, person.group.position.z);
-                }
-            });
-        }
-
-        function updateTemperature(deltaTime) {
-            if (isSpraying) {
-                currentTemperature -= temperatureChangeRate * deltaTime;
-                if (currentTemperature < minTemperature) currentTemperature = minTemperature;
-            } else {
-                currentTemperature += temperatureChangeRate * deltaTime;
-                if (currentTemperature > maxTemperature) currentTemperature = maxTemperature;
-            }
-            document.getElementById('temperature-display').textContent = currentTemperature.toFixed(1) + '°C';
-        }
-
-        function toggleSpraying() {
-            isSpraying = !isSpraying;
-            document.getElementById('spray-button').textContent = isSpraying ? '關閉水霧' : '開啟水霧';
-            if (isSpraying) {
-                // Clear existing persons
-                persons.forEach(p => {
-                    scene.remove(p.group);
-                    scene.remove(p.sprite);
+    
+            function createGround() {
+                const groundGeometry = new THREE.PlaneGeometry(parkSize.width, parkSize.depth);
+                const groundMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2E8B57,
+                    roughness: 0.95,
+                    metalness: 0.05
                 });
-                persons = [];
-
-                // Generate 3-5 persons
-                const peopleCount = Math.floor(Math.random() * 3) + 3;
-                for (let i = 0; i < peopleCount; i++) {
-                    const group = createPerson();
-                    const sprite = createDialogueSprite();
-                    const start = getRandomPosition(true);
-                    const end = getRandomPosition(false);
-                    const speed = 5 + Math.random() * 2; // Slight variation in speed
-
-                    group.position.copy(start);
-                    sprite.position.set(start.x, start.y + 2.5, start.z);
-
-                    scene.add(group);
-                    scene.add(sprite);
-
-                    persons.push({
-                        group,
-                        sprite,
-                        start,
-                        end,
-                        progress: 0,
-                        speed,
-                        active: true
-                    });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                scene.add(ground);
+    
+                const gridHelper = new THREE.GridHelper(parkSize.width, parkSize.width, 0x444444, 0x444444);
+                gridHelper.position.y = 0.01;
+                scene.add(gridHelper);
+            }
+    
+            function createBrickTexture() {
+                const canvas = document.createElement('canvas');
+                const size = 256;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = '#8B4513'; // Red-brown
+                ctx.fillRect(0, 0, size, size);
+                
+                ctx.strokeStyle = '#5C4033'; // Darker mortar color
+                ctx.lineWidth = 4;
+    
+                const brickSize = size / 4;
+                for (let i = 0; i <= 4; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * brickSize, 0);
+                    ctx.lineTo(i * brickSize, size);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * brickSize);
+                    ctx.lineTo(size, i * brickSize);
+                    ctx.stroke();
                 }
-            } else {
-                particleSystems.forEach(ps => {
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(10, 32); // Repeat texture to simulate 1x1 bricks
+                return texture;
+            }
+    
+            function createBrickPathsAndBenches() {
+                const pathWidth = totalSize.width - parkSize.width; // 僅一邊延伸
+                const pathDepth = totalSize.depth;
+                const brickMat = new THREE.MeshStandardMaterial({
+                    map: createBrickTexture(),
+                    roughness: 0.8
+                });
+    
+                const pathGeom = new THREE.PlaneGeometry(pathWidth, pathDepth);
+                
+                // 只在左邊延伸
+                const pathLeft = new THREE.Mesh(pathGeom, brickMat);
+                pathLeft.rotation.x = -Math.PI / 2;
+                pathLeft.position.x = -parkSize.width / 2 - pathWidth / 2;
+                pathLeft.receiveShadow = true;
+                scene.add(pathLeft);
+    
+                // Benches on left path, facing the park (reversed direction)
+                const benchLeft1 = createBench();
+                benchLeft1.position.set(-parkSize.width / 2 - 2, 0, 5);
+                benchLeft1.rotation.y = -Math.PI / 2; // 反轉方向，面對負x方向? 調整為面對公園
+                scene.add(benchLeft1);
+    
+                const benchLeft2 = createBench();
+                benchLeft2.position.set(-parkSize.width / 2 - 2, 0, -5);
+                benchLeft2.rotation.y = -Math.PI / 2; // 反轉方向
+                scene.add(benchLeft2);
+            }
+    
+            function createBench() {
+                const group = new THREE.Group();
+                const woodMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
+                const legMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 });
+    
+                const plankGeom = new THREE.BoxGeometry(3, 0.1, 0.3);
+                for(let i = 0; i < 3; i++) {
+                    const seatPlank = new THREE.Mesh(plankGeom, woodMat);
+                    seatPlank.position.set(0, 0.5, -0.35 + i * 0.35);
+                    group.add(seatPlank);
+                }
+                 for(let i = 0; i < 4; i++) {
+                    const backPlank = new THREE.Mesh(plankGeom, woodMat);
+                    backPlank.position.set(0, 1.0 + i * 0.2, 0.5);
+                    backPlank.rotation.x = Math.PI / 2;
+                    group.add(backPlank);
+                }
+    
+                const legGeom = new THREE.BoxGeometry(0.1, 0.8, 0.8);
+                const leg1 = new THREE.Mesh(legGeom, legMat);
+                leg1.position.set(-1.4, 0.4, 0);
+                group.add(leg1);
+                const leg2 = leg1.clone();
+                leg2.position.x = 1.4;
+                group.add(leg2);
+    
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; });
+                return group;
+            }
+    
+            function createSchoolSignTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 1024;
+                const ctx = canvas.getContext('2d');
+    
+                ctx.fillStyle = '#FDF5E6'; // Match school wall color
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+                ctx.font = 'bold 90px KaiTi, "SimHei", sans-serif';
+                ctx.fillStyle = '#A52A2A'; // Brown color for text
+                ctx.textAlign = 'center';
+                
+                const text = '學中理衞道循圍水天';
+                const reversed_text = text.split('').reverse().join(''); // 反轉文字方向
+                for (let i = 0; i < reversed_text.length; i++) {
+                    ctx.fillText(reversed_text[i], canvas.width / 2, 110 + i * 100);
+                }
+    
+                return new THREE.CanvasTexture(canvas);
+            }
+    
+            function createSchoolBuilding() {
+                const group = new THREE.Group();
+                const schoolWidth = 8, schoolHeight = 10, schoolDepth = 8;
+    
+                const schoolMat = new THREE.MeshStandardMaterial({
+                    color: 0xFDF5E6, // Old Lace - a nice white/beige
+                    roughness: 0.8
+                });
+                const schoolGeom = new THREE.BoxGeometry(schoolWidth, schoolHeight, schoolDepth);
+                const schoolMesh = new THREE.Mesh(schoolGeom, schoolMat);
+                schoolMesh.castShadow = true;
+                schoolMesh.receiveShadow = true;
+                group.add(schoolMesh);
+    
+                const signTexture = createSchoolSignTexture();
+                const signGeom = new THREE.PlaneGeometry(1.28, 10.24); // 垂直比例
+                const signMat = new THREE.MeshBasicMaterial({ map: signTexture });
+                const signMesh = new THREE.Mesh(signGeom, signMat);
+                
+                // Position sign on the side facing the park (positive x direction)
+                signMesh.position.set(schoolWidth / 2 + 0.01, 0, 0);
+                signMesh.rotation.y = Math.PI / 2; // 反轉旋轉方向
+                group.add(signMesh);
+    
+                // Position the whole building
+                const pathEdgeX = -parkSize.width / 2 - (totalSize.width - parkSize.width) / 2;
+                group.position.set(pathEdgeX - schoolWidth / 2 - 2, schoolHeight / 2, 0);
+                
+                scene.add(group);
+            }
+            
+            function createFacilities() {
+                const facilityCreators = {
+                    slide: createSlide, swing: createSwing, seesaw: createSeesaw,
+                    jungleGym: createJungleGym, sandbox: createSandbox, merryGoRound: createMerryGoRound
+                };
+                facilities.forEach(f => {
+                    const facilityMesh = facilityCreators[f.name]();
+                    facilityMesh.position.copy(f.pos);
+                    scene.add(facilityMesh);
+                });
+            }
+            
+            function createFlowerBushes() {
+                const bushGroup = new THREE.Group();
+                const bushColors = [0xff6347, 0xee82ee, 0xffd700, 0xadd8e6];
+    
+                function createBush(position) {
+                    const bush = new THREE.Group();
+                    const foliageGeom = new THREE.IcosahedronGeometry(0.8 + Math.random() * 0.4, 1);
+                    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x004d00, roughness: 0.9 });
+                    const foliage = new THREE.Mesh(foliageGeom, foliageMat);
+                    foliage.castShadow = true;
+                    bush.add(foliage);
+                    const flowerCount = 15 + Math.floor(Math.random() * 10);
+                    const flowerGeom = new THREE.SphereGeometry(0.1, 8, 8);
+                    for (let i = 0; i < flowerCount; i++) {
+                        const flowerMat = new THREE.MeshBasicMaterial({ color: bushColors[Math.floor(Math.random() * bushColors.length)] });
+                        const flower = new THREE.Mesh(flowerGeom, flowerMat);
+                        const phi = Math.random() * Math.PI * 2;
+                        const theta = Math.random() * Math.PI;
+                        flower.position.setFromSphericalCoords(0.8, phi, theta);
+                        bush.add(flower);
+                    }
+                    bush.position.copy(position);
+                    bush.position.y = 0.5;
+                    return bush;
+                }
+    
+                // Along +Z and -Z edges (parallel)
+                for (let x = -parkSize.width / 2; x <= parkSize.width / 2; x += 2.5) {
+                    // Top edge (+Z)
+                    const zPosTop = parkSize.depth / 2 - 1;
+                    bushGroup.add(createBush(new THREE.Vector3(x + (Math.random() - 0.5), 0, zPosTop)));
+                    // Bottom edge (-Z)
+                    const zPosBottom = -parkSize.depth / 2 + 1;
+                    bushGroup.add(createBush(new THREE.Vector3(x + (Math.random() - 0.5), 0, zPosBottom)));
+                }
+                scene.add(bushGroup);
+            }
+    
+            function createPoles() {
+                const step = 8;
+                const avoidanceRadius = 2.0;
+    
+                for (let x = -parkSize.width / 2 + step / 2; x <= parkSize.width / 2 - step / 2; x += step) {
+                    for (let z = -parkSize.depth / 2 + step / 2; z <= parkSize.depth / 2 - step / 2; z += step) {
+                        const polePos = new THREE.Vector3(x, 0, z);
+                        
+                        let isTooClose = facilities.some(f => polePos.distanceTo(f.pos) < f.radius + avoidanceRadius);
+    
+                        if (!isTooClose) {
+                            let sprayDirections = ['left', 'right'];
+                            facilities.forEach(f => {
+                                const dist = polePos.distanceTo(f.pos);
+                                if (dist < f.radius + 5.0) {
+                                    const vecToFacility = new THREE.Vector3().subVectors(f.pos, polePos);
+                                    // If facility is to the right (+x), remove 'right'
+                                    if (vecToFacility.x > 1.0) {
+                                        sprayDirections = sprayDirections.filter(d => d !== 'right');
+                                    }
+                                    // If facility is to the left (-x), remove 'left'
+                                    if (vecToFacility.x < -1.0) {
+                                        sprayDirections = sprayDirections.filter(d => d !== 'left');
+                                    }
+                                }
+                            });
+                            
+                            if (sprayDirections.length > 0) {
+                                createPole(polePos, sprayDirections);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            function createPole(position, sprayDirections) {
+                const poleGroup = new THREE.Group();
+                poleGroup.position.copy(position);
+                const poleHeight = 2;
+                const poleRadius = 0.05;
+                const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
+                const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.9, roughness: 0.4 });
+                const poleMesh = new THREE.Mesh(poleGeometry, poleMaterial);
+                poleMesh.position.y = poleHeight / 2;
+                poleMesh.castShadow = true;
+                poleGroup.add(poleMesh);
+                const nozzleGeometry = new THREE.CylinderGeometry(poleRadius * 1.5, poleRadius * 1.5, 0.1, 16);
+                const nozzleMesh = new THREE.Mesh(nozzleGeometry, poleMaterial);
+                nozzleMesh.position.y = poleHeight;
+                poleGroup.add(nozzleMesh);
+                const panelGroup = new THREE.Group();
+                const panelWidth = 0.6;
+                const panelHeight = 0.4;
+                const panelGeometry = new THREE.BoxGeometry(panelWidth, panelHeight, 0.02);
+                const panelTexture = createSolarPanelTexture(panelWidth * 100, panelHeight * 100);
+                const panelMaterial = new THREE.MeshStandardMaterial({ map: panelTexture, side: THREE.DoubleSide });
+                const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+                panelGroup.add(panelMesh);
+                panelGroup.position.set(0, poleHeight - 0.3, 0);
+                panelGroup.rotation.x = Math.PI / 4;
+                poleGroup.add(panelGroup);
+                scene.add(poleGroup);
+                const poleData = {
+                    mesh: poleGroup,
+                    nozzlePosition: new THREE.Vector3(position.x, position.y + poleHeight, position.z),
+                    sprayDirections: sprayDirections
+                };
+                poles.push(poleData);
+                particleSystems.push(createParticleSystem());
+            }
+    
+            function createSolarPanelTexture(width, height) {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#87CEEB';
+                context.fillRect(0, 0, width, height);
+                context.strokeStyle = '#00008B';
+                context.lineWidth = width / 20;
+                context.strokeRect(0, 0, width, height);
+                context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                context.lineWidth = width / 50;
+                const lineCount = 10;
+                for (let i = 1; i < lineCount; i++) {
+                    const y = (i / lineCount) * height;
+                    context.beginPath();
+                    context.moveTo(0, y);
+                    context.lineTo(width, y);
+                    context.stroke();
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+    
+            // --- Facility Creation Functions (remain the same) ---
+            function createSlide() {
+                const group = new THREE.Group();
+                const slideMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.4, metalness: 0.2 });
+                const supportMat = new THREE.MeshStandardMaterial({ color: 0xdc143c, roughness: 0.7 });
+                const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 6), slideMat);
+                ramp.position.set(0, 1.5, -1); ramp.rotation.x = -Math.PI / 7; group.add(ramp);
+                const platform = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 1.5), slideMat);
+                platform.position.set(0, 3, 2.5); group.add(platform);
+                for (let i = 0; i < 7; i++) {
+                    const step = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 0.4), supportMat);
+                    step.position.set(0, 0.45 * i + 0.2, 3.5); group.add(step);
+                }
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+            function createSwing() {
+                const group = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0x4682b4, roughness: 0.6 });
+                const seatMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+                const chainMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 1 });
+                const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4.5), mat);
+                leg1.position.set(-2, 2.1, 0); leg1.rotation.z = Math.PI / 10; group.add(leg1);
+                const leg2 = leg1.clone(); leg2.position.x = 2; leg2.rotation.z = -Math.PI / 10; group.add(leg2);
+                const topBar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5), mat);
+                topBar.position.y = 4; topBar.rotation.z = Math.PI / 2; group.add(topBar);
+                function addSeat(xPos) {
+                    const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.5), seatMat);
+                    seat.position.set(xPos, 0.8, 0); group.add(seat);
+                    const chain1 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 3.2), chainMat);
+                    chain1.position.set(xPos - 0.4, 2.4, 0); group.add(chain1);
+                    const chain2 = chain1.clone(); chain2.position.x = xPos + 0.4; group.add(chain2);
+                }
+                addSeat(-1.2); addSeat(1.2);
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+            function createSeesaw() {
+                const group = new THREE.Group();
+                const plankMat = new THREE.MeshStandardMaterial({ color: 0x32cd32, roughness: 0.8 });
+                const supportMat = new THREE.MeshStandardMaterial({ color: 0xff4500, roughness: 0.7 });
+                const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1), supportMat);
+                pivot.position.y = 0.5; pivot.rotation.x = Math.PI / 2; group.add(pivot);
+                const plank = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 0.6), plankMat);
+                plank.position.y = 1; plank.rotation.z = Math.PI / 12; group.add(plank);
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+            function createJungleGym() {
+                const group = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0x00008b, metalness: 0.8, roughness: 0.5 });
+                const bar = new THREE.CylinderGeometry(0.08, 0.08, 4, 12);
+                const positions = [[-2, 2], [2, 2], [-2, -2], [2, -2]];
+                positions.forEach(p => { const post = new THREE.Mesh(bar, mat); post.position.set(p[0], 2, p[1]); group.add(post); });
+                const hBarGeom = new THREE.CylinderGeometry(0.08, 0.08, 4.2, 12);
+                const hBar1 = new THREE.Mesh(hBarGeom, mat); hBar1.position.set(0, 1.5, 2); hBar1.rotation.x = Math.PI / 2; group.add(hBar1);
+                const hBar2 = hBar1.clone(); hBar2.position.z = -2; group.add(hBar2);
+                const hBar3 = new THREE.Mesh(hBarGeom, mat); hBar3.position.set(2, 2.5, 0); hBar3.rotation.z = Math.PI / 2; group.add(hBar3);
+                const hBar4 = hBar3.clone(); hBar4.position.x = -2; group.add(hBar4);
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+            function createSandbox() {
+                const group = new THREE.Group();
+                const woodMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.8 });
+                const sandMat = new THREE.MeshStandardMaterial({ color: 0xf0e68c, roughness: 0.9 });
+                const sand = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), sandMat);
+                sand.position.y = 0.1; sand.receiveShadow = true; group.add(sand);
+                const borderGeom = new THREE.BoxGeometry(4.4, 0.4, 0.2);
+                const border1 = new THREE.Mesh(borderGeom, woodMat); border1.position.set(0, 0.2, 2.1); group.add(border1);
+                const border2 = border1.clone(); border2.position.z = -2.1; group.add(border2);
+                const border3 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 4), woodMat);
+                border3.position.set(2.1, 0.2, 0); group.add(border3);
+                const border4 = border3.clone(); border4.position.x = -2.1; group.add(border4);
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+            function createMerryGoRound() {
+                const group = new THREE.Group();
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x8a2be2, roughness: 0.6 });
+                const handleMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.7 });
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32), baseMat);
+                base.position.y = 0.1; group.add(base);
+                const centerPost = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 16), handleMat);
+                centerPost.position.y = 0.6; group.add(centerPost);
+                const handleWheel = new THREE.Mesh(new THREE.TorusGeometry(1, 0.1, 16, 32), handleMat);
+                handleWheel.position.y = 1.1; handleWheel.rotation.x = Math.PI / 2; group.add(handleWheel);
+                group.traverse(c => { if(c.isMesh) c.castShadow = true; }); return group;
+            }
+    
+            // --- Particle System ---
+            function createParticleSystem() {
+                const particleCount = 1500;
+                const particles = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const particleData = [];
+                const particleTexture = (() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 128; canvas.height = 128;
+                    const context = canvas.getContext('2d');
+                    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+                    gradient.addColorStop(0, 'rgba(255,255,255,0.5)');
+                    gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                    context.fillStyle = gradient;
+                    context.fillRect(0, 0, 128, 128);
+                    return new THREE.CanvasTexture(canvas);
+                })();
+                const pMaterial = new THREE.PointsMaterial({
+                    color: 0xeeeeff, size: 0.15, map: particleTexture,
+                    blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
+                });
+                for (let i = 0; i < particleCount; i++) {
+                    particleData.push({ position: new THREE.Vector3(), velocity: new THREE.Vector3(), lifetime: 0 });
+                    positions[i * 3 + 1] = -100;
+                }
+                particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const particleSystem = new THREE.Points(particles, pMaterial);
+                scene.add(particleSystem);
+                return { system: particleSystem, data: particleData, geometry: particles };
+            }
+    
+            function updateParticles(deltaTime) {
+                particleSystems.forEach((ps, poleIndex) => {
+                    if (!isSpraying) {
+                        if (ps.system.visible) ps.system.visible = false;
+                        return;
+                    }
+                    if (!ps.system.visible) ps.system.visible = true;
+    
+                    const pole = poles[poleIndex];
                     const positions = ps.geometry.attributes.position.array;
+                    const origin = pole.nozzlePosition;
+                    const sprayDirections = pole.sprayDirections;
+    
                     for (let i = 0; i < ps.data.length; i++) {
-                        ps.data[i].lifetime = 0;
-                        positions[i * 3 + 1] = -100;
+                        let p = ps.data[i];
+    
+                        if (p.lifetime > 0) {
+                            p.lifetime -= deltaTime;
+                            p.velocity.addScaledVector(gravity, deltaTime);
+                            p.position.addScaledVector(p.velocity, deltaTime);
+                            
+                            if (p.position.y <= 0.05) {
+                                p.lifetime = 0; // Disappear on ground contact
+                            }
+                        } else if (Math.random() < 0.08) {
+                            p.lifetime = 2.5 + Math.random() * 1.5;
+                            p.position.copy(origin);
+                            
+                            const directionChoice = sprayDirections[Math.floor(Math.random() * sprayDirections.length)];
+                            
+                            // Main direction: left (-X) or right (+X)
+                            const baseAngle = (directionChoice === 'right') ? 0 : Math.PI;
+                            
+                            // Fan shape spread for front/back (along Z axis)
+                            const fanAngleSpread = 1.4; // Radians, approx 80 degrees
+                            const randomAngleOffset = (Math.random() - 0.5) * fanAngleSpread;
+                            
+                            const finalAngle = baseAngle + randomAngleOffset;
+                            const speed = 1.2 + Math.random() * 0.3;
+                            
+                            p.velocity.set(
+                                Math.cos(finalAngle) * speed,
+                                0.1, // Slight initial upward velocity
+                                Math.sin(finalAngle) * speed // This component creates the front/back spread
+                            );
+                        }
+    
+                        if (p.lifetime > 0) {
+                            positions[i * 3] = p.position.x;
+                            positions[i * 3 + 1] = p.position.y;
+                            positions[i * 3 + 2] = p.position.z;
+                        } else {
+                            positions[i * 3 + 1] = -100; // Hide particle
+                        }
                     }
                     ps.geometry.attributes.position.needsUpdate = true;
                 });
-                // Remove all persons and dialogues
-                persons.forEach(p => {
-                    scene.remove(p.group);
-                    scene.remove(p.sprite);
-                });
-                persons = [];
             }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
-            controls.update();
-            updateParticles(deltaTime);
-            updateTemperature(deltaTime);
-            updatePersons(deltaTime);
-            renderer.render(scene, camera);
-        }
-
-        init();
-    </script>
-</body>
-</html>
+    
+            function createPerson(type) {
+                const group = new THREE.Group();
+                let scale = 1;
+                if (type === 'child') {
+                    scale = 0.7; // Make children smaller
+                }
+    
+                // Body
+                const bodyGeom = new THREE.BoxGeometry(0.5 * scale, 1 * scale, 0.3 * scale);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x87CEEB });
+                const body = new THREE.Mesh(bodyGeom, bodyMat);
+                body.position.y = 1 * scale;
+                group.add(body);
+    
+                // Head
+                const headGeom = new THREE.SphereGeometry(0.3 * scale, 32, 32);
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xFFDAB9 });
+                const head = new THREE.Mesh(headGeom, headMat);
+                head.position.y = 1.8 * scale;
+                group.add(head);
+    
+                // Legs
+                const legGeom = new THREE.CylinderGeometry(0.1 * scale, 0.1 * scale, 1 * scale, 16);
+                const legMat = new THREE.MeshStandardMaterial({ color: 0x00008B });
+                const leftLeg = new THREE.Mesh(legGeom, legMat);
+                leftLeg.position.set(-0.15 * scale, 0.5 * scale, 0);
+                group.add(leftLeg);
+                const rightLeg = leftLeg.clone();
+                rightLeg.position.x = 0.15 * scale;
+                group.add(rightLeg);
+    
+                group.traverse(c => { if (c.isMesh) c.castShadow = true; });
+                return group;
+            }
+    
+            function createDialogueSprite(type) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 128;
+                const context = canvas.getContext('2d');
+                context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.fillStyle = 'black';
+                context.font = 'bold 36px Arial'; // 加大字体
+                context.textAlign = 'center';
+                let text = '現在公園涼了很多,不像之前那麼熱了';
+                if (type === 'child') {
+                    text = '温度終於下降了,父母肯帯我出來玩';
+                }
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(5, 1.25, 1); // 相应调整scale以匹配加大字体
+                return sprite;
+            }
+    
+            function getRandomPosition(outside, isChild = false) {
+                let x = (Math.random() - 0.5) * parkSize.width;
+                let z = (Math.random() - 0.5) * parkSize.depth;
+                if (outside) {
+                    // From outside, e.g., from left side
+                    return new THREE.Vector3(-parkSize.width / 2 - Math.random() * 5 - 1, 0, z);
+                } else if (isChild) {
+                    // For child, go to a random facility with slight offset
+                    const randomFacility = facilities[Math.floor(Math.random() * facilities.length)];
+                    const offsetX = (Math.random() - 0.5) * 1.5; // Slight offset to not overlap exactly
+                    const offsetZ = (Math.random() - 0.5) * 1.5;
+                    return new THREE.Vector3(randomFacility.pos.x + offsetX, 0, randomFacility.pos.z + offsetZ);
+                } else {
+                    // Inside park for adults
+                    return new THREE.Vector3(x, 0, z);
+                }
+            }
+    
+            function updatePersons(deltaTime) {
+                persons.forEach(person => {
+                    if (person.active) {
+                        person.progress += deltaTime * person.speed / person.start.distanceTo(person.end);
+                        if (person.progress >= 1) {
+                            person.progress = 1;
+                            person.active = false;
+                        }
+                        person.group.position.lerpVectors(person.start, person.end, person.progress);
+                        person.sprite.position.set(person.group.position.x, person.group.position.y + 2.5, person.group.position.z);
+                    }
+                });
+            }
+    
+            function updateTemperature(deltaTime) {
+                if (isSpraying) {
+                    currentTemperature -= temperatureChangeRate * deltaTime;
+                    if (currentTemperature < minTemperature) currentTemperature = minTemperature;
+                } else {
+                    currentTemperature += temperatureChangeRate * deltaTime;
+                    if (currentTemperature > maxTemperature) currentTemperature = maxTemperature;
+                }
+                document.getElementById('temperature-display').textContent = currentTemperature.toFixed(1) + '°C';
+            }
+    
+            function toggleSpraying() {
+                isSpraying = !isSpraying;
+                document.getElementById('spray-button').textContent = isSpraying ? '關閉水霧' : '開啟水霧';
+                if (isSpraying) {
+                    // Clear existing persons
+                    persons.forEach(p => {
+                        scene.remove(p.group);
+                        scene.remove(p.sprite);
+                    });
+                    persons = [];
+    
+                    // Generate 3-5 persons
+                    const peopleCount = Math.floor(Math.random() * 3) + 3;
+                    for (let i = 0; i < peopleCount; i++) {
+                        const type = Math.random() < 0.5 ? 'adult' : 'child';
+                        const group = createPerson(type);
+                        const sprite = createDialogueSprite(type);
+                        const start = getRandomPosition(true);
+                        const end = getRandomPosition(false, type === 'child');
+                        const speed = 5 + Math.random() * 2; // Slight variation in speed
+    
+                        group.position.copy(start);
+                        sprite.position.set(start.x, start.y + 2.5, start.z);
+    
+                        scene.add(group);
+                        scene.add(sprite);
+    
+                        persons.push({
+                            group,
+                            sprite,
+                            start,
+                            end,
+                            progress: 0,
+                            speed,
+                            active: true
+                        });
+                    }
+                } else {
+                    particleSystems.forEach(ps => {
+                        const positions = ps.geometry.attributes.position.array;
+                        for (let i = 0; i < ps.data.length; i++) {
+                            ps.data[i].lifetime = 0;
+                            positions[i * 3 + 1] = -100;
+                        }
+                        ps.geometry.attributes.position.needsUpdate = true;
+                    });
+                    // Remove all persons and dialogues
+                    persons.forEach(p => {
+                        scene.remove(p.group);
+                        scene.remove(p.sprite);
+                    });
+                    persons = [];
+                }
+            }
+    
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+    
+            function animate() {
+                requestAnimationFrame(animate);
+                const deltaTime = clock.getDelta();
+                controls.update();
+                updateParticles(deltaTime);
+                updateTemperature(deltaTime);
+                updatePersons(deltaTime);
+                renderer.render(scene, camera);
+            }
+    
+            init();
+        </script>
+    </body>
+    </html>
+    </DOCUMENT>
