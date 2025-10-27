@@ -573,7 +573,7 @@
                 const pMaterial = new THREE.PointsMaterial({
                     color: 0xeeeeff, size: 0.15, map: particleTexture,
                     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-                    opacity: 0.1
+                    opacity: 0.3
                 });
                 for (let i = 0; i < particleCount; i++) {
                     particleData.push({ position: new THREE.Vector3(), velocity: new THREE.Vector3(), lifetime: 0 });
